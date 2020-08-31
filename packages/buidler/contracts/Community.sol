@@ -5,7 +5,7 @@ import "./ICommunity.sol";
 
 contract Community is ICommunity {
   address master;
-  IMaster _Master;
+  IMaster Master;
 
   struct Tier {
     uint threshold;
@@ -21,8 +21,8 @@ contract Community is ICommunity {
   }
 
   struct CommunityInfo {
-    address root;
-    address user;
+    address payable root;
+    address payable user;
     string name;
     uint deadline; //uint should be timestamp
     string image; // should point to storage hash of a default image
@@ -32,6 +32,8 @@ contract Community is ICommunity {
     address[] fundedBy;
     Content[] content;
   }
+
+  CommunityInfo communityInfo;
 
   event Created(address createdBy, address _address, string name, uint time);
   event TierAdded(address community, uint threshold, uint epochs, string name, uint time);
@@ -44,27 +46,52 @@ contract Community is ICommunity {
   event Unfollowed(address unfollower, address unfollowed, uint time);
 
   modifier onlyOwner {
-      require(msg.sender == CommunityInfo.user || msg.sender == CommunityInfo.root);
+      require(msg.sender == communityInfo.user || msg.sender == communityInfo.root);
       _;
   }
 
   modifier onlyMember(address destination) {
     require(
-      _Master.getType(destination) == _Master.Types.USER ||
-      _Master.getType(destination) == _Master.Types.COMMUNITY
+      Master.getType(destination) == Master.Types.USER || // compiler error  TypeError: Member "Types" not found or not visible after argument-dependent lookup in contract IMaster.
+      Master.getType(destination) == Master.Types.COMMUNITY // compiler error
     );
     _;
   }
 
   constructor(address _root, string memory _name, address _master) public {
       master = _master;
+      Master = new IMaster(_master); // compiler error Cannot instantiate Interface
 
-      CommunityInfo.root = _root;
-      CommunityInfo.user = msg.sender;
-      CommunityInfo.name = _name;
+      communityInfo.root = _root;
+      communityInfo.user = msg.sender;
+      communityInfo.name = _name;
 
       emit Created(msg.sender, address(this), _name, now);
   }
+
+  function getCommunityInfo() public view returns (
+      address root,
+      address user,
+      string memory name,
+      uint deadline,
+      string memory image,
+      // Tier[] tiers, // needs a solution
+      address[] memory likes,
+      address[] memory follows,
+      address[] memory fundedBy
+      // Content[] content // needs a solution
+    ) {
+      return (
+        communityInfo.root,
+        communityInfo.user,
+        communityInfo.name,
+        communityInfo.deadline,
+        communityInfo.image,
+        communityInfo.likes,
+        communityInfo.follows,
+        communityInfo.fundedBy
+      );
+    }
 
   function addTier(
       uint _threshold,
@@ -72,9 +99,9 @@ contract Community is ICommunity {
       string memory _name,
       string memory _description // could be should use a contentHash instead
   )
-      public onlyOwner
+      public override onlyOwner
   {
-      CommunityInfo.tiers.push(Tier({
+      communityInfo.tiers.push(Tier({
           threshold: _threshold,
           epochs: _epochs,
           name: _name,
@@ -88,13 +115,13 @@ contract Community is ICommunity {
       string memory _tierName,
       string memory _contentHash
   )
-      public onlyOwner
+      public override onlyOwner
   {
       assert(
           isTier(_tierName),
           "tier does not exist"
       );
-      CommunityInfo.content.push(Content({
+      communityInfo.content.push(Content({
           tierName: _tierName,
           contentHash: _contentHash
       }));
@@ -106,59 +133,59 @@ contract Community is ICommunity {
 
   // should I put in like/unlike
 
-  function cashOut(uint amount) public onlyOwner {
-      CommunityInfo.root.transfer(amount);
+  function cashOut(uint amount) public override onlyOwner {
+       communityInfo.root.transfer(amount);
 
-      emit CashedOut(address(this), CommunityInfo.root, amount, now);
+      emit CashedOut(address(this), communityInfo.root, amount, now);
   }
 
-  function getLiked(address liker) public onlyMember(liker) {
+  function getLiked(address liker) public override onlyMember(liker) {
     require(liker == msg.sender);
     assert(
-      !isIn(liker, CommunityInfo.likedBy),
+      !isIn(liker, communityInfo.likedBy),
       "user has already liked this"
     );
-    CommunityInfo.likedBy.push(liker);
+    communityInfo.likedBy.push(liker);
 
     emit Liked(liker, address(this), now);
   }
 
-  function getUnliked(address unliker) public onlyMember(unliker) {
+  function getUnliked(address unliker) public override onlyMember(unliker) {
     require(unliker == msg.sender);
     assert(
-      isIn(unliker, CommunityInfo.getLiked),
+      isIn(unliker, communityInfo.getLiked),
       "user has not yet liked this"
     );
-    CommunityInfo.likedBy.pop(unliker);
+    communityInfo.likedBy.pop(unliker);
 
     emit Unliked(unliker, address(this), now);
   }
 
-  function getFollowed(address follower) public onlyMember(follower) {
+  function getFollowed(address follower) public override onlyMember(follower) {
     require(follower == msg.sender);
     assert(
-      !isIn(follower, CommunityInfo.followedBy),
+      !isIn(follower, communityInfo.followedBy),
       "user has already followed"
     );
-    CommunityInfo.likedBy.push(follower);
+    communityInfo.likedBy.push(follower);
 
     emit Followed(follower, address(this), now);
   }
 
-  function getUnfollowed(address unfollower) public onlyMember(unfollower) {
+  function getUnfollowed(address unfollower) public override onlyMember(unfollower) {
     require(unfollower == msg.sender);
     assert(
-      isIn(unfollower, CommunityInfo.followedBy),
+      isIn(unfollower, communityInfo.followedBy),
       "user has not yet followed"
     );
-    CommunityInfo.followedBy.pop(unfollower);
+    communityInfo.followedBy.pop(unfollower);
 
     emit Unliked(unfollower, address(this), now);
   }
 
   function isTier(string memory _tierName) internal view {
-    for(uint i = 0; i < CommunityInfo.tiers.length; i++){
-        if(CommunityInfo.tiers[i].name == _tierName) return true;
+    for(uint i = 0; i < communityInfo.tiers.length; i++){
+        if(communityInfo.tiers[i].name == _tierName) return true;
     }
     return false;
   }

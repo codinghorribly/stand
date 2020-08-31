@@ -8,11 +8,11 @@ contract Master is IMaster {
   address[] public users;
   address[] public communitiesAndProjects;
 
-  enum Types {
-    USER,
-    COMMUNITY,
-    DELETED
-  }
+  // enum Types {
+  //   USER,
+  //   COMMUNITY,
+  //   DELETED
+  // }
 
   mapping (address => Types) typeOf;
 
@@ -42,11 +42,11 @@ contract Master is IMaster {
     emit Created(address(this), now);
   }
 
-  function getType(address _address) public view {
+  function getType(address _address) public override view returns (Types) {
     return typeOf[_address];
   }
 
-  function createUser(string memory name) public {
+  function createUser(string memory name) public override {
     address userContract = new User(msg.sender, name);
     users.push(userContract);
     typeOf[userContract] = Types.USER;
@@ -54,7 +54,7 @@ contract Master is IMaster {
     emit UserCreated(msg.sender, userContract, name, now);
   }
 
-  function deleteUser(address user) public {
+  function deleteUser(address user) public override {
     require(msg.sender == user);
     user.pop(user);
     typeOf.user = Types.DELETED;
@@ -62,7 +62,7 @@ contract Master is IMaster {
     emit UserRemoved(user, now);
   }
 
-  function addCommunity(address root, address userContract, address communityContract) public onlyUser {
+  function addCommunity(address root, address userContract, address communityContract) public override onlyUser {
     require(
       userContract == msg.sender,
       "unauthorized contract call"
@@ -77,7 +77,7 @@ contract Master is IMaster {
     emit CommProjCreated(msg.sender, communityContract, now);
   }
 
-  function removeCommunity(address root, address communityContract) public onlyUser {
+  function removeCommunity(address root, address communityContract) public override onlyUser {
     require(
       communityContract == msg.sender,
       "unauthorized contract call"
